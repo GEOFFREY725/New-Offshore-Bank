@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>New Offshore Bank – Online Banking Portal</title>
+  <script type="module">
+    // Firebase configuration
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import jsPDF from "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.es.min.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCRO_3fxhpElTFfeBFsCJAwIMLGlFk__JM",
+      authDomain: "new-offshore-bank.firebaseapp.com",
+      projectId: "new-offshore-bank",
+      storageBucket: "new-offshore-bank.firebasestorage.app",
+      messagingSenderId: "821741530630",
+      appId: "1:821741530630:web:1c076052417a1309579d87",
+      measurementId: "G-8CSYLGHS0B"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth();
+
+    window.register = async () => {
+      const name = document.getElementById("regName").value.trim();
+      const email = document.getElementById("regUsername").value.trim();
+      const password = document.getElementById("regPassword").value;
+      const pin = document.getElementById("regPin").value;
+      if (!name || !email || !password || pin.length !== 4) return alert("Fill all fields.");
+
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCred.user.uid;
+        const accountNo = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+        const iban = `NOBKUS33US${accountNo}`;
+
+        await setDoc(doc(db, "users", uid), {
+          name,
+          email,
+          pin,
+          accountNo,
+          iban,
+          balance: 10540740,
+          transactions: [
+            { detail: "Salary Deposit", amount: 10540740, timestamp: Date.now() }
+            
+          ]
+        });
+
+        alert("Account created!");
+        show("loginPage");
+      } catch (error) {
+        alert("Error: " + error.message);
+      }
+    };
+
+    window.login = async () => {
+      const email = document.getElementById("loginUsername").value;
+      const password = document.getElementById("loginPassword").value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        alert("Login failed: " + error.message);
+      }
+    };
+
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        const uid = user.uid;
+        const docSnap = await getDoc(doc(db, "users", uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          document.getElementById("welcomeName").innerText = `Welcome, ${data.name}`;
+          document.getElementById("accountNo").innerText = data.accountNo;
+          document.getElementById("iban").innerText = data.iban;
+          document.getElementById("balance").innerText = data.balance.toFixed(2);
+
+          const log = document.getElementById("transactionList");
+          log.innerHTML = "";
+          data.transactions.slice().reverse().forEach(tx => {
+            const row = document.createElement("div");
+            row.className = "log-item";
+            row.innerHTML = `<span>${tx.detail}</span><span>$${tx.amount.toFixed(2)}</span>`;
+            log.appendChild(row);
+          });
+          show("dashboard");
+        }
+      } else {
+        show("registerPage");
+      }
+    });
+
+    window.logout = async () => {
+      await signOut(auth);
+      show("loginPage");
+    };
+
+    window.downloadStatement = () => {
+      const doc = new jsPDF();
+      const name = document.getElementById("welcomeName").innerText;
+      const acc = document.getElementById("accountNo").innerText;
+      const iban = document.getElementById("iban").innerText;
+      const balance = document.getElementById("balance").innerText;
+
+      doc.setFontSize(16);
+      doc.text("New Offshore Bank Statement", 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Name: ${name}`, 20, 30);
+      doc.text(`Account No: ${acc}`, 20, 40);
+      doc.text(`IBAN: ${iban}`, 20, 50);
+      doc.text(`Balance: $${balance}`, 20, 60);
+
+      const rows = Array.from(document.querySelectorAll("#transactionList .log-item"))
+        .map((el, i) => `${i + 1}. ${el.innerText}`);
+
+      rows.forEach((line, i) => {
+        doc.text(line, 20, 80 + i * 10);
+      });
+
+      doc.save("BankStatement.pdf");
+    };
+
+    function show(id) {
+      ["registerPage", "loginPage", "dashboard"].forEach(x => document.getElementById(x).classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+    }
+  </script>
+  <style>
+    body { background-image: url('https://images.unsplash.com/photo-1549921296-3a6b7bfbab64'); background-size: cover; background-repeat: no-repeat; background-attachment: fixed; }
+    /* additional styles omitted for brevity (same as previous) */
+  </style>
+</head>
+<body>
+<!-- content omitted for brevity; same layout as before -->
+<button onclick="downloadStatement()">Download Statement</button>
+</body>
+</html>
